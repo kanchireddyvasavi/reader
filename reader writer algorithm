@@ -1,0 +1,59 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h> // For sleep()
+
+sem_t x, y; // Semaphores for readers and writers
+pthread_t writerthreads[100], readerthreads[100];
+int readercount = 0;
+
+void *reader(void *param) {
+    sem_wait(&x);
+    readercount++;
+    if (readercount == 1)
+        sem_wait(&y); // First reader locks the writer
+    sem_post(&x);
+
+    printf("\n%d reader is inside", readercount);
+
+    sem_wait(&x);
+    readercount--;
+    if (readercount == 0)
+        sem_post(&y); // Last reader releases the writer
+    sem_post(&x);
+
+    printf("\n%d Reader is leaving", readercount + 1);
+}
+
+void *writer(void *param) {
+    printf("\nWriter is trying to enter");
+    sem_wait(&y); // Writer waits for exclusive access
+    printf("\nWriter has entered");
+    sem_post(&y); // Writer releases the resource
+    printf("\nWriter is leaving");
+}
+
+int main() {
+    int n2, i;
+    printf("Enter the number of readers: ");
+    scanf("%d", &n2);
+
+    sem_init(&x, 0, 1); // Initialize semaphores
+    sem_init(&y, 0, 1);
+
+    for (i = 0; i < n2; i++) {
+        pthread_create(&writerthreads[i], NULL, reader, NULL);
+        pthread_create(&readerthreads[i], NULL, writer, NULL);
+    }
+
+    for (i = 0; i < n2; i++) {
+        pthread_join(writerthreads[i], NULL);
+        pthread_join(readerthreads[i], NULL);
+    }
+
+    sem_destroy(&x); // Clean up semaphores
+    sem_destroy(&y);
+
+    return 0;
+}
